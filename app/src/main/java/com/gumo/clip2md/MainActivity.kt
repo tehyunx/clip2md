@@ -34,6 +34,14 @@ class MainActivity : AppCompatActivity() {
             if (uri != null) writeMarkdownToUri(uri)
         }
 
+    private val historyLauncher =
+        registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val id = result.data?.getLongExtra(HistoryActivity.EXTRA_ENTRY_ID, -1) ?: -1
+                if (id != -1L) loadHistoryEntry(id)
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -58,6 +66,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnSave).setOnClickListener { saveResultToFile() }
         findViewById<Button>(R.id.btnRaw).setOnClickListener { toggleRawHtml() }
         findViewById<Button>(R.id.btnPreview).setOnClickListener { togglePreview() }
+        findViewById<Button>(R.id.btnHistory).setOnClickListener {
+            historyLauncher.launch(Intent(this, HistoryActivity::class.java))
+        }
 
         handleIncomingIntent(intent)
 
@@ -76,12 +87,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleIncomingIntent(intent: Intent?) {
-        if (intent?.action == Intent.ACTION_SEND) {
-            val htmlText = intent.getStringExtra(Intent.EXTRA_HTML_TEXT)
-            val plainText = intent.getStringExtra(Intent.EXTRA_TEXT)
-            when {
-                !htmlText.isNullOrBlank() -> convertOrQueue(htmlText)
-                !plainText.isNullOrBlank() -> editResult.setText(plainText)
+        when (intent?.action) {
+            Intent.ACTION_SEND -> {
+                val htmlText = intent.getStringExtra(Intent.EXTRA_HTML_TEXT)
+                val plainText = intent.getStringExtra(Intent.EXTRA_TEXT)
+                when {
+                    !htmlText.isNullOrBlank() -> convertOrQueue(htmlText)
+                    !plainText.isNullOrBlank() -> editResult.setText(plainText)
+                }
+            }
+            Intent.ACTION_VIEW -> {
+                val uri = intent.data ?: return
+                try {
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        val text = input.bufferedReader().readText()
+                        showEditMode()
+                        showingRaw = false
+                        lastRawHtml = null
+                        editResult.setText(text)
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this, "파일을 열 수 없습니다: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -107,7 +134,19 @@ class MainActivity : AppCompatActivity() {
         lastRawHtml = html
         showingRaw = false
         showEditMode()
-        if (bridgeReady) convert(html) else pendingHtml = html
+        if (bridgeReady) {
+            convert(html) { md -> HistoryStore.save(this, md, html) }
+        } else {
+            pendingHtml = html
+        }
+    }
+
+    private fun loadHistoryEntry(id: Long) {
+        val md = HistoryStore.loadMarkdown(this, id) ?: return
+        lastRawHtml = HistoryStore.loadRawHtml(this, id)
+        showingRaw = false
+        showEditMode()
+        editResult.setText(md)
     }
 
     private fun convert(html: String, onDone: ((String) -> Unit)? = null) {
@@ -193,7 +232,10 @@ class MainActivity : AppCompatActivity() {
         showingRaw = false
         showEditMode()
         if (bridgeReady) {
-            convert(html) { md -> callback(md) }
+            convert(html) { md ->
+                HistoryStore.save(this, md, html)
+                callback(md)
+            }
         } else {
             pendingHtml = html
             callback("")
