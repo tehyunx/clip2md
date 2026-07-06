@@ -334,4 +334,20 @@ class MainActivity : AppCompatActivity() {
             callback(text)
         }
     }
+
+    /** Renders the CURRENT edit-box markdown to HTML via marked.js and returns
+     *  the resulting body innerHTML, so preview correctness can be checked
+     *  without eyes on the device (e.g. whether an <img> tag is really there). */
+    fun renderPreviewForDebug(callback: (String) -> Unit) {
+        val markdown = editResult.text.toString()
+        val escaped = org.json.JSONObject.quote(markdown)
+        webView.evaluateJavascript("renderPreview($escaped); document.body.innerHTML;") { result ->
+            val html = try {
+                JSONTokener(result).nextValue() as? String ?: result
+            } catch (e: Exception) {
+                result
+            }
+            callback(html)
+        }
+    }
 }

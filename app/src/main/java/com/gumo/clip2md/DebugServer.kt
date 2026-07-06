@@ -41,6 +41,11 @@ class DebugServer(private val activity: MainActivity) : NanoHTTPD("127.0.0.1", 8
                     newFixedLengthResponse(result)
                 }
 
+                session.method == Method.GET && session.uri == "/preview" -> {
+                    val result = runPreviewSync()
+                    newFixedLengthResponse(Response.Status.OK, "text/html", result)
+                }
+
                 else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "not found")
             }
         } catch (e: Exception) {
@@ -73,6 +78,19 @@ class DebugServer(private val activity: MainActivity) : NanoHTTPD("127.0.0.1", 8
         activity.runOnUiThread {
             activity.pasteForDebug { md ->
                 result = md
+                latch.countDown()
+            }
+        }
+        latch.await()
+        return result
+    }
+
+    private fun runPreviewSync(): String {
+        val latch = CountDownLatch(1)
+        var result = ""
+        activity.runOnUiThread {
+            activity.renderPreviewForDebug { html ->
+                result = html
                 latch.countDown()
             }
         }
