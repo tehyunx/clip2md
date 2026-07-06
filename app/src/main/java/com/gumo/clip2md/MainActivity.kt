@@ -49,6 +49,18 @@ class MainActivity : AppCompatActivity() {
         editResult = findViewById(R.id.editResult)
         previewContainer = findViewById(R.id.previewContainer)
 
+        // Restore state that would otherwise be lost if Android kills this
+        // process in the background (very common — this is NOT a fresh
+        // launch, it's a state restore after process death) and re-apply it
+        // once the WebView bridge is ready to receive convert()/renderPreview().
+        val restoredText = savedInstanceState?.getString(KEY_TEXT)
+        val restoredRaw = savedInstanceState?.getString(KEY_RAW)
+        val restoredShowingRaw = savedInstanceState?.getBoolean(KEY_SHOWING_RAW) ?: false
+        val restoredShowingPreview = savedInstanceState?.getBoolean(KEY_SHOWING_PREVIEW) ?: false
+        lastRawHtml = restoredRaw
+        showingRaw = restoredShowingRaw
+        if (restoredText != null) editResult.setText(restoredText)
+
         webView = WebView(this)
         webView.settings.javaScriptEnabled = true
         webView.webViewClient = object : android.webkit.WebViewClient() {
@@ -58,6 +70,7 @@ class MainActivity : AppCompatActivity() {
                     convert(html) { md -> HistoryStore.save(this@MainActivity, md, html) }
                 }
                 pendingHtml = null
+                if (restoredShowingPreview) togglePreview()
             }
         }
         webView.loadUrl("file:///android_asset/bridge.html")
@@ -78,9 +91,24 @@ class MainActivity : AppCompatActivity() {
         debugServer = DebugServer(this).also { it.start() }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(KEY_TEXT, editResult.text.toString())
+        outState.putString(KEY_RAW, lastRawHtml)
+        outState.putBoolean(KEY_SHOWING_RAW, showingRaw)
+        outState.putBoolean(KEY_SHOWING_PREVIEW, showingPreview)
+    }
+
     override fun onDestroy() {
         debugServer?.stop()
         super.onDestroy()
+    }
+
+    companion object {
+        private const val KEY_TEXT = "text"
+        private const val KEY_RAW = "raw"
+        private const val KEY_SHOWING_RAW = "showing_raw"
+        private const val KEY_SHOWING_PREVIEW = "showing_preview"
     }
 
     override fun onNewIntent(intent: Intent) {
