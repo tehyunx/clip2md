@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="turndown.js"></script>
+<script src="turndown-plugin-gfm.js"></script>
+<script>
+var turndownService = new TurndownService({
+  headingStyle: 'atx',
+  codeBlockStyle: 'fenced',
+  hr: '---',
+  bulletListMarker: '-'
+});
+if (typeof turndownPluginGfm !== 'undefined') {
+  turndownService.use(turndownPluginGfm.gfm);
+}
+
+function convertHtml(html) {
+  try {
+    return turndownService.turndown(html);
+  } catch (e) {
+    return 'ERROR: ' + e.message;
+  }
+}
+</script>
+</head>
+<body></body>
+</html>
