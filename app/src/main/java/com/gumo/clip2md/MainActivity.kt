@@ -20,6 +20,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var editResult: EditText
     private var bridgeReady = false
     private var pendingHtml: String? = null
+    private var lastRawHtml: String? = null
+    private var showingRaw = false
 
     private val createDocumentLauncher =
         registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/markdown")) { uri ->
@@ -46,6 +48,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnPaste).setOnClickListener { pasteFromClipboard() }
         findViewById<Button>(R.id.btnCopy).setOnClickListener { copyResultToClipboard() }
         findViewById<Button>(R.id.btnSave).setOnClickListener { saveResultToFile() }
+        findViewById<Button>(R.id.btnRaw).setOnClickListener { toggleRawHtml() }
 
         handleIncomingIntent(intent)
     }
@@ -85,6 +88,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun convertOrQueue(html: String) {
+        lastRawHtml = html
+        showingRaw = false
         if (bridgeReady) convert(html) else pendingHtml = html
     }
 
@@ -97,6 +102,20 @@ class MainActivity : AppCompatActivity() {
                 result
             }
             runOnUiThread { editResult.setText(markdown) }
+        }
+    }
+
+    private fun toggleRawHtml() {
+        val raw = lastRawHtml
+        if (raw == null) {
+            Toast.makeText(this, "아직 변환한 내용이 없습니다", Toast.LENGTH_SHORT).show()
+            return
+        }
+        showingRaw = !showingRaw
+        if (showingRaw) {
+            editResult.setText(raw)
+        } else {
+            convert(raw)
         }
     }
 
