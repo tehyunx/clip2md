@@ -41,16 +41,35 @@
             android:layout_weight="1"
             android:layout_marginStart="8dp"
             android:text="원본" />
+
+        <Button
+            android:id="@+id/btnPreview"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="미리보기" />
     </LinearLayout>
 
-    <EditText
-        android:id="@+id/editResult"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="top|start"
-        android:inputType="textMultiLine"
-        android:scrollbars="vertical"
-        android:hint="여기에 변환된 마크다운이 표시됩니다" />
+        android:layout_weight="1">
+
+        <EditText
+            android:id="@+id/editResult"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="top|start"
+            android:inputType="textMultiLine"
+            android:scrollbars="vertical"
+            android:hint="여기에 변환된 마크다운이 표시됩니다" />
+
+        <FrameLayout
+            android:id="@+id/previewContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+    </FrameLayout>
 
 </LinearLayout>

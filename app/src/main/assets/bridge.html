@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <script src="turndown.js"></script>
 <script src="turndown-plugin-gfm.js"></script>
+<script src="marked.min.js"></script>
+<style>
+  body { font-family: sans-serif; padding: 12px; line-height: 1.5; word-wrap: break-word; }
+  img { max-width: 100%; height: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  table, th, td { border: 1px solid #ccc; }
+  th, td { padding: 6px 8px; }
+  pre { white-space: pre-wrap; background: #f2f2f2; padding: 8px; border-radius: 4px; }
+</style>
 <script>
 var turndownService = new TurndownService({
   headingStyle: 'atx',
@@ -46,6 +55,14 @@ function convertHtml(html) {
     return turndownService.turndown(container.innerHTML);
   } catch (e) {
     return 'ERROR: ' + e.message;
+  }
+}
+
+function renderPreview(markdown) {
+  try {
+    document.body.innerHTML = marked.parse(markdown);
+  } catch (e) {
+    document.body.innerText = 'ERROR: ' + e.message;
   }
 }
 </script>
