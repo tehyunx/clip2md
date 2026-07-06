@@ -54,7 +54,9 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient = object : android.webkit.WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 bridgeReady = true
-                pendingHtml?.let { convert(it) }
+                pendingHtml?.let { html ->
+                    convert(html) { md -> HistoryStore.save(this@MainActivity, md, html) }
+                }
                 pendingHtml = null
             }
         }
@@ -63,6 +65,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btnPaste).setOnClickListener { pasteFromClipboard() }
         findViewById<Button>(R.id.btnCopy).setOnClickListener { copyResultToClipboard() }
+        findViewById<Button>(R.id.btnListSave).setOnClickListener { saveToListAndReset() }
         findViewById<Button>(R.id.btnSave).setOnClickListener { saveResultToFile() }
         findViewById<Button>(R.id.btnRaw).setOnClickListener { toggleRawHtml() }
         findViewById<Button>(R.id.btnPreview).setOnClickListener { togglePreview() }
@@ -139,6 +142,24 @@ class MainActivity : AppCompatActivity() {
         } else {
             pendingHtml = html
         }
+    }
+
+    private fun saveToListAndReset() {
+        val markdown = editResult.text.toString()
+        if (markdown.isBlank()) {
+            Toast.makeText(this, "저장할 내용이 없습니다", Toast.LENGTH_SHORT).show()
+            return
+        }
+        HistoryStore.save(this, markdown, lastRawHtml)
+        Toast.makeText(this, "기록에 저장했습니다", Toast.LENGTH_SHORT).show()
+        resetToNewMemo()
+    }
+
+    private fun resetToNewMemo() {
+        lastRawHtml = null
+        showingRaw = false
+        showEditMode()
+        editResult.setText("")
     }
 
     private fun loadHistoryEntry(id: Long) {
