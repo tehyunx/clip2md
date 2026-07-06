@@ -35,9 +35,17 @@ object HistoryStore {
         indexFile(context).writeText(arr.toString())
     }
 
-    fun save(context: Context, markdown: String, rawHtml: String?): Long {
+    fun newId(): Long = System.currentTimeMillis()
+
+    /** Per-entry folder for downloaded images, referenced by absolute file:// links. */
+    fun imagesDir(context: Context, id: Long): File =
+        File(dir(context), "${id}_images").apply { mkdirs() }
+
+    fun save(context: Context, markdown: String, rawHtml: String?): Long =
+        save(context, newId(), markdown, rawHtml)
+
+    fun save(context: Context, id: Long, markdown: String, rawHtml: String?): Long {
         if (markdown.isBlank()) return -1
-        val id = System.currentTimeMillis()
         File(dir(context), "$id.md").writeText(markdown)
         if (rawHtml != null) {
             File(dir(context), "$id.html").writeText(rawHtml)
@@ -47,23 +55,30 @@ object HistoryStore {
             ?.take(60) ?: "(제목 없음)"
 
         val arr = readIndex(context)
+        // Replace any existing entry with the same id (re-saves shouldn't duplicate).
+        val withoutDup = JSONArray()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            if (o.getLong("id") != id) withoutDup.put(o)
+        }
         val entry = JSONObject()
         entry.put("id", id)
         entry.put("timestamp", id)
         entry.put("title", title)
-        arr.put(entry)
+        withoutDup.put(entry)
 
         // Trim oldest entries beyond MAX_ENTRIES
-        while (arr.length() > MAX_ENTRIES) {
-            val removed = arr.getJSONObject(0)
+        while (withoutDup.length() > MAX_ENTRIES) {
+            val removed = withoutDup.getJSONObject(0)
             File(dir(context), "${removed.getLong("id")}.md").delete()
             File(dir(context), "${removed.getLong("id")}.html").delete()
+            File(dir(context), "${removed.getLong("id")}_images").deleteRecursively()
             val trimmed = JSONArray()
-            for (i in 1 until arr.length()) trimmed.put(arr.getJSONObject(i))
+            for (i in 1 until withoutDup.length()) trimmed.put(withoutDup.getJSONObject(i))
             writeIndex(context, trimmed)
             return id
         }
-        writeIndex(context, arr)
+        writeIndex(context, withoutDup)
         return id
     }
 

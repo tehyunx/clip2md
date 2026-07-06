@@ -13,8 +13,8 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.documentfile.provider.DocumentFile
 import org.json.JSONTokener
-import java.io.OutputStreamWriter
 import java.util.concurrent.CountDownLatch
 
 class MainActivity : AppCompatActivity() {
@@ -29,9 +29,9 @@ class MainActivity : AppCompatActivity() {
     private var showingPreview = false
     private var debugServer: DebugServer? = null
 
-    private val createDocumentLauncher =
-        registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/markdown")) { uri ->
-            if (uri != null) writeMarkdownToUri(uri)
+    private val openTreeLauncher =
+        registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri != null) writeMarkdownToTree(uri)
         }
 
     private val historyLauncher =
@@ -150,9 +150,21 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "저장할 내용이 없습니다", Toast.LENGTH_SHORT).show()
             return
         }
-        HistoryStore.save(this, markdown, lastRawHtml)
-        Toast.makeText(this, "기록에 저장했습니다", Toast.LENGTH_SHORT).show()
-        resetToNewMemo()
+        val raw = lastRawHtml
+        Toast.makeText(this, "이미지 포함 저장 중...", Toast.LENGTH_SHORT).show()
+        Thread {
+            val id = HistoryStore.newId()
+            val rewritten = try {
+                ImageDownloader.process(markdown, HistoryStore.imagesDir(this, id), absoluteLinks = true)
+            } catch (e: Exception) {
+                markdown
+            }
+            HistoryStore.save(this, id, rewritten, raw)
+            runOnUiThread {
+                Toast.makeText(this, "기록에 저장했습니다", Toast.LENGTH_SHORT).show()
+                resetToNewMemo()
+            }
+        }.start()
     }
 
     private fun resetToNewMemo() {
@@ -178,7 +190,9 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 result
             }
-            runOnUiThread { editResult.setText(markdown) }
+            // Guard against a delayed (e.g. cold-start pending) conversion
+            // clobbering a raw-HTML view the user has since switched to.
+            runOnUiThread { if (!showingRaw) editResult.setText(markdown) }
             onDone?.invoke(markdown)
         }
     }
@@ -225,20 +239,60 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveResultToFile() {
-        createDocumentLauncher.launch("clip.md")
+        if (editResult.text.toString().isBlank()) {
+            Toast.makeText(this, "저장할 내용이 없습니다", Toast.LENGTH_SHORT).show()
+            return
+        }
+        openTreeLauncher.launch(null)
     }
 
-    private fun writeMarkdownToUri(uri: Uri) {
-        try {
-            contentResolver.openOutputStream(uri)?.use { out ->
-                OutputStreamWriter(out).use { writer ->
-                    writer.write(editResult.text.toString())
+    private fun writeMarkdownToTree(treeUri: Uri) {
+        val markdown = editResult.text.toString()
+        Toast.makeText(this, "이미지 포함 저장 중...", Toast.LENGTH_SHORT).show()
+        Thread {
+            try {
+                val root = DocumentFile.fromTreeUri(this, treeUri)
+                    ?: throw IllegalStateException("폴더를 열 수 없습니다")
+
+                val tempImagesDir = java.io.File(cacheDir, "export_${System.currentTimeMillis()}")
+                val rewritten = try {
+                    ImageDownloader.process(markdown, tempImagesDir, absoluteLinks = false)
+                } catch (e: Exception) {
+                    markdown
                 }
+
+                root.findFile("note.md")?.delete()
+                val noteFile = root.createFile("text/markdown", "note")
+                    ?: throw IllegalStateException("note.md 생성 실패")
+                contentResolver.openOutputStream(noteFile.uri)?.use { out ->
+                    out.write(rewritten.toByteArray())
+                }
+
+                if (tempImagesDir.exists() && tempImagesDir.listFiles()?.isNotEmpty() == true) {
+                    root.findFile("images")?.delete()
+                    val imagesDoc = root.createDirectory("images")
+                    tempImagesDir.listFiles()?.forEach { imgFile ->
+                        val mime = when (imgFile.extension.lowercase()) {
+                            "png" -> "image/png"
+                            "gif" -> "image/gif"
+                            "webp" -> "image/webp"
+                            else -> "image/jpeg"
+                        }
+                        val dest = imagesDoc?.createFile(mime, imgFile.nameWithoutExtension)
+                        if (dest != null) {
+                            contentResolver.openOutputStream(dest.uri)?.use { out ->
+                                imgFile.inputStream().use { it.copyTo(out) }
+                            }
+                        }
+                    }
+                }
+                tempImagesDir.deleteRecursively()
+
+                runOnUiThread { Toast.makeText(this, "저장했습니다 (note.md + images)", Toast.LENGTH_SHORT).show() }
+            } catch (e: Exception) {
+                runOnUiThread { Toast.makeText(this, "저장 실패: ${e.message}", Toast.LENGTH_SHORT).show() }
             }
-            Toast.makeText(this, "저장했습니다", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
-            Toast.makeText(this, "저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
+        }.start()
     }
 
     // ---- Debug HTTP API hooks (called from DebugServer's background thread
