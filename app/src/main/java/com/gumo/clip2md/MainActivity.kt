@@ -306,10 +306,12 @@ class MainActivity : AppCompatActivity() {
                 val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
                 "![$alt](data:$mime;base64,$b64)"
             } catch (e: Exception) {
-                match.value
+                "![$alt](ERROR:${e.javaClass.simpleName}:${e.message})"
             }
         }
     }
+
+    fun embedLocalImagesForDebug(): String = embedLocalImagesAsDataUri(editResult.text.toString())
 
     private fun showEditMode() {
         showingPreview = false

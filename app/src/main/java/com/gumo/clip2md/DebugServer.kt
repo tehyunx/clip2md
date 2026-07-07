@@ -46,6 +46,11 @@ class DebugServer(private val activity: MainActivity) : NanoHTTPD("127.0.0.1", 8
                     newFixedLengthResponse(Response.Status.OK, "text/html", result)
                 }
 
+                session.method == Method.GET && session.uri == "/embed-check" -> {
+                    val result = runEmbedCheckSync()
+                    newFixedLengthResponse(Response.Status.OK, "text/plain", result)
+                }
+
                 else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "not found")
             }
         } catch (e: Exception) {
@@ -93,6 +98,17 @@ class DebugServer(private val activity: MainActivity) : NanoHTTPD("127.0.0.1", 8
                 result = html
                 latch.countDown()
             }
+        }
+        latch.await()
+        return result
+    }
+
+    private fun runEmbedCheckSync(): String {
+        val latch = CountDownLatch(1)
+        var result = ""
+        activity.runOnUiThread {
+            result = activity.embedLocalImagesForDebug()
+            latch.countDown()
         }
         latch.await()
         return result
