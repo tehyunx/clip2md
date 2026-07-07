@@ -71,9 +71,7 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 bridgeReady = true
                 pendingHtml?.let { html ->
-                    convert(html, skipDisplayIfShowingRaw = true) { md ->
-                        HistoryStore.save(this@MainActivity, md, html)
-                    }
+                    convert(html, skipDisplayIfShowingRaw = true)
                 }
                 pendingHtml = null
                 if (restoredShowingPreview) togglePreview()
@@ -172,7 +170,7 @@ class MainActivity : AppCompatActivity() {
         showingRaw = false
         showEditMode()
         if (bridgeReady) {
-            convert(html) { md -> HistoryStore.save(this, md, html) }
+            convert(html)
         } else {
             pendingHtml = html
         }
@@ -350,10 +348,7 @@ class MainActivity : AppCompatActivity() {
         showingRaw = false
         showEditMode()
         if (bridgeReady) {
-            convert(html) { md ->
-                HistoryStore.save(this, md, html)
-                callback(md)
-            }
+            convert(html) { md -> callback(md) }
         } else {
             pendingHtml = html
             callback("")
