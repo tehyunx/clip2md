@@ -46,6 +46,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    private val pickImageLauncher =
+        registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) insertLocalImage(uri)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -88,6 +93,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnPreview).setOnClickListener { togglePreview() }
         findViewById<Button>(R.id.btnHistory).setOnClickListener {
             historyLauncher.launch(Intent(this, HistoryActivity::class.java))
+        }
+        findViewById<Button>(R.id.btnInsertImage).setOnClickListener {
+            pickImageLauncher.launch("image/*")
         }
 
         handleIncomingIntent(intent)
@@ -270,6 +278,35 @@ class MainActivity : AppCompatActivity() {
         showingPreview = false
         previewContainer.visibility = View.GONE
         editResult.visibility = View.VISIBLE
+    }
+
+    /** Copies a user-picked local image into app storage and inserts a
+     *  markdown image link at the cursor — local photos otherwise have no
+     *  way into a note since they never pass through an HTML paste/share. */
+    private fun insertLocalImage(uri: Uri) {
+        try {
+            val mime = contentResolver.getType(uri) ?: "image/jpeg"
+            val ext = when {
+                mime.contains("png") -> "png"
+                mime.contains("gif") -> "gif"
+                mime.contains("webp") -> "webp"
+                else -> "jpg"
+            }
+            val attachmentsDir = java.io.File(filesDir, "attachments").apply { mkdirs() }
+            val destFile = java.io.File(attachmentsDir, "img_${System.currentTimeMillis()}.$ext")
+            contentResolver.openInputStream(uri)?.use { input ->
+                destFile.outputStream().use { output -> input.copyTo(output) }
+            } ?: throw IllegalStateException("이미지를 읽을 수 없습니다")
+
+            val markdownTag = "![](file://${destFile.absolutePath})"
+            val start = editResult.selectionStart.takeIf { it >= 0 } ?: editResult.text.length
+            val end = editResult.selectionEnd.takeIf { it >= 0 } ?: editResult.text.length
+            editResult.text.replace(minOf(start, end), maxOf(start, end), markdownTag)
+
+            Toast.makeText(this, "이미지를 추가했습니다", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "이미지 추가 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun copyResultToClipboard() {

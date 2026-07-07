@@ -71,6 +71,14 @@
             android:layout_weight="1"
             android:layout_marginStart="8dp"
             android:text="기록" />
+
+        <Button
+            android:id="@+id/btnInsertImage"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="이미지추가" />
     </LinearLayout>
 
     <FrameLayout
