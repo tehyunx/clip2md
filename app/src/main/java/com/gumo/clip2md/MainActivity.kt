@@ -37,8 +37,12 @@ class MainActivity : AppCompatActivity() {
     private val historyLauncher =
         registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
+                val merged = result.data?.getStringExtra(HistoryActivity.EXTRA_MERGED_MARKDOWN)
                 val id = result.data?.getLongExtra(HistoryActivity.EXTRA_ENTRY_ID, -1) ?: -1
-                if (id != -1L) loadHistoryEntry(id)
+                when {
+                    merged != null -> loadMergedMarkdown(merged)
+                    id != -1L -> loadHistoryEntry(id)
+                }
             }
         }
 
@@ -210,6 +214,15 @@ class MainActivity : AppCompatActivity() {
         showingRaw = false
         showEditMode()
         editResult.setText(md)
+    }
+
+    private fun loadMergedMarkdown(merged: String) {
+        // Merged from multiple entries — no single raw HTML applies anymore.
+        lastRawHtml = null
+        showingRaw = false
+        showEditMode()
+        editResult.setText(merged)
+        Toast.makeText(this, "선택한 기록을 병합했습니다", Toast.LENGTH_SHORT).show()
     }
 
     private fun convert(html: String, skipDisplayIfShowingRaw: Boolean = false, onDone: ((String) -> Unit)? = null) {
