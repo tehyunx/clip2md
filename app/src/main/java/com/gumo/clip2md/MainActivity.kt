@@ -67,7 +67,9 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 bridgeReady = true
                 pendingHtml?.let { html ->
-                    convert(html) { md -> HistoryStore.save(this@MainActivity, md, html) }
+                    convert(html, skipDisplayIfShowingRaw = true) { md ->
+                        HistoryStore.save(this@MainActivity, md, html)
+                    }
                 }
                 pendingHtml = null
                 if (restoredShowingPreview) togglePreview()
@@ -210,7 +212,7 @@ class MainActivity : AppCompatActivity() {
         editResult.setText(md)
     }
 
-    private fun convert(html: String, onDone: ((String) -> Unit)? = null) {
+    private fun convert(html: String, skipDisplayIfShowingRaw: Boolean = false, onDone: ((String) -> Unit)? = null) {
         val escaped = org.json.JSONObject.quote(html)
         webView.evaluateJavascript("convertHtml($escaped)") { result ->
             val markdown = try {
@@ -218,9 +220,9 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 result
             }
-            // Guard against a delayed (e.g. cold-start pending) conversion
-            // clobbering a raw-HTML view the user has since switched to.
-            runOnUiThread { if (!showingRaw) editResult.setText(markdown) }
+            runOnUiThread {
+                if (!skipDisplayIfShowingRaw || !showingRaw) editResult.setText(markdown)
+            }
             onDone?.invoke(markdown)
         }
     }
