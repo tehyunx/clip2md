@@ -101,4 +101,22 @@ object HistoryStore {
         val f = File(dir(context), "$id.html")
         return if (f.exists()) f.readText() else null
     }
+
+    fun delete(context: Context, ids: Collection<Long>) {
+        if (ids.isEmpty()) return
+        val idSet = ids.toSet()
+        val arr = readIndex(context)
+        val kept = JSONArray()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            if (o.getLong("id") in idSet) {
+                File(dir(context), "${o.getLong("id")}.md").delete()
+                File(dir(context), "${o.getLong("id")}.html").delete()
+                File(dir(context), "${o.getLong("id")}_images").deleteRecursively()
+            } else {
+                kept.put(o)
+            }
+        }
+        writeIndex(context, kept)
+    }
 }

@@ -4,4 +4,8 @@
         android:id="@+id/action_merge"
         android:title="병합"
         android:showAsAction="always" />
+    <item
+        android:id="@+id/action_delete"
+        android:title="삭제"
+        android:showAsAction="always" />
 </menu>
