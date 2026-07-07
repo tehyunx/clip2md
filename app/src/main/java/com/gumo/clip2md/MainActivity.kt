@@ -72,6 +72,16 @@ class MainActivity : AppCompatActivity() {
 
         webView = WebView(this)
         webView.settings.javaScriptEnabled = true
+        webView.settings.allowFileAccess = true
+        // bridge.html loads from file:///android_asset/ but locally-inserted
+        // images live under file:///data/.../files/attachments/ — a DIFFERENT
+        // file:// origin. WebView blocks cross-file-origin resource loads
+        // unless these are explicitly enabled. Safe here since this WebView
+        // never navigates to untrusted remote content.
+        @Suppress("DEPRECATION")
+        webView.settings.allowFileAccessFromFileURLs = true
+        @Suppress("DEPRECATION")
+        webView.settings.allowUniversalAccessFromFileURLs = true
         webView.webViewClient = object : android.webkit.WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 bridgeReady = true
