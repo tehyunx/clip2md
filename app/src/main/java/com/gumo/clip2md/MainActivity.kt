@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Base64
 import android.view.View
 import android.webkit.WebView
 import android.widget.Button
@@ -274,13 +275,39 @@ class MainActivity : AppCompatActivity() {
     private fun togglePreview() {
         showingPreview = !showingPreview
         if (showingPreview) {
-            val markdown = editResult.text.toString()
+            val markdown = embedLocalImagesAsDataUri(editResult.text.toString())
             val escaped = org.json.JSONObject.quote(markdown)
             webView.evaluateJavascript("renderPreview($escaped)", null)
             editResult.visibility = View.GONE
             previewContainer.visibility = View.VISIBLE
         } else {
             showEditMode()
+        }
+    }
+
+    /** Replaces ![alt](file://...) links with base64 data: URIs before handing
+     *  markdown to the WebView for preview — WebView's renderer process can't
+     *  reliably read arbitrary file:// paths even within this app's own
+     *  storage, but a self-contained data: URI needs no file access at all. */
+    private fun embedLocalImagesAsDataUri(markdown: String): String {
+        val regex = Regex("""!\[([^\]]*)]\(file://([^)\s]+)\)""")
+        return regex.replace(markdown) { match ->
+            val alt = match.groupValues[1]
+            val path = match.groupValues[2]
+            try {
+                val file = java.io.File(path)
+                val bytes = file.readBytes()
+                val mime = when (file.extension.lowercase()) {
+                    "png" -> "image/png"
+                    "gif" -> "image/gif"
+                    "webp" -> "image/webp"
+                    else -> "image/jpeg"
+                }
+                val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                "![$alt](data:$mime;base64,$b64)"
+            } catch (e: Exception) {
+                match.value
+            }
         }
     }
 
@@ -424,7 +451,7 @@ class MainActivity : AppCompatActivity() {
      *  the resulting body innerHTML, so preview correctness can be checked
      *  without eyes on the device (e.g. whether an <img> tag is really there). */
     fun renderPreviewForDebug(callback: (String) -> Unit) {
-        val markdown = editResult.text.toString()
+        val markdown = embedLocalImagesAsDataUri(editResult.text.toString())
         val escaped = org.json.JSONObject.quote(markdown)
         webView.evaluateJavascript("renderPreview($escaped); document.body.innerHTML;") { result ->
             val html = try {
